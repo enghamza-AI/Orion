@@ -3,7 +3,7 @@
 [![CI](https://github.com/enghamza-AI/Orion/actions/workflows/ci.yml/badge.svg)](https://github.com/enghamza-AI/Orion/actions)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![HuggingFace Space](https://img.shields.io/badge/🤗-Live%20Demo-yellow)](https://huggingface.co/spaces/enghamza-AI/Orion)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 
 > **Upload any tabular medical dataset. Get the truth about your model in 90 seconds.**
 
