@@ -1,17 +1,11 @@
 # app.py
-# ─────────────────────────────────────────────────────────────────────────────
-# CLINICAL AI FAILURE OBSERVATORY — Main Streamlit Application
-# This is the ONLY file the user interacts with.
-# It handles: file upload, demo loading, running all engines,
-#             displaying results, and offering PDF download.
-# Run with: streamlit run app.py
-# ─────────────────────────────────────────────────────────────────────────────
 
-import streamlit as st          # Streamlit: turns Python into a web app
+
+import streamlit as st          
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt  # for the learning curve chart
-import matplotlib                # for color maps
+import matplotlib.pyplot as plt  
+import matplotlib                
 import io
 import os
 
@@ -20,20 +14,15 @@ from core.orchestrator import Orchestrator
 from core.trust_score import TrustScoreEngine
 from core.pdf_reporter import PDFReporter
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PAGE CONFIG — must be the FIRST Streamlit call in any app
-# Sets the browser tab title, icon, and layout width
-# ─────────────────────────────────────────────────────────────────────────────
+
 st.set_page_config(
     page_title="Clinical AI Failure Observatory",
     page_icon="🔬",
-    layout="wide",              # use the full browser width
+    layout="wide",              
     initial_sidebar_state="expanded"
 )
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CUSTOM CSS — inject raw CSS to style the app beyond Streamlit's defaults
-# ─────────────────────────────────────────────────────────────────────────────
+
 st.markdown("""
 <style>
     /* Main background */
@@ -86,42 +75,32 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-# unsafe_allow_html=True is needed to inject raw HTML/CSS into Streamlit
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPER FUNCTIONS
-# ─────────────────────────────────────────────────────────────────────────────
+
+
 
 def severity_badge(severity: str) -> str:
-    """
-    Return an HTML badge for a given severity string.
-    Used to display colored severity labels in tables and text.
-    """
+  
     css_class = f"badge-{severity.lower()}" if severity.lower() in \
                 ["high", "medium", "low", "none"] else "badge-none"
     return f'<span class="{css_class}">{severity}</span>'
 
 
 def load_demo_data() -> pd.DataFrame:
-    """
-    Load the demo dataset from the data/ folder.
-    If the file doesn't exist, generate a synthetic demo dataset.
-    This ensures the app always works even without the real CSV.
-    """
+   
     demo_path = "data/demo_sample.csv"
 
     if os.path.exists(demo_path):
-        # Load real demo file
+      
         return pd.read_csv(demo_path)
     else:
-        # Generate synthetic data that mimics credit risk data structure
-        # This is our fallback so the app never crashes on demo
+       
         np.random.seed(42)
         n = 2000
 
         df = pd.DataFrame({
-            # Numeric features — realistic credit risk variables
+          
             'AMT_INCOME_TOTAL':    np.random.lognormal(11, 0.5, n),
             'AMT_CREDIT':          np.random.lognormal(12, 0.6, n),
             'AMT_ANNUITY':         np.random.lognormal(9, 0.4, n),
@@ -132,30 +111,29 @@ def load_demo_data() -> pd.DataFrame:
             'EXT_SOURCE_2':        np.random.beta(3, 4, n),
             'EXT_SOURCE_3':        np.random.beta(2, 3, n),
 
-            # Categorical features
+            
             'NAME_CONTRACT_TYPE':  np.random.choice(['Cash loans', 'Revolving loans'], n),
             'CODE_GENDER':         np.random.choice(['M', 'F'], n, p=[0.4, 0.6]),
             'NAME_EDUCATION_TYPE': np.random.choice(
                 ['Secondary', 'Higher education', 'Incomplete higher'], n
             ),
 
-            # Missing values — simulate real-world messiness
-            # np.nan inserted randomly by masking ~15% of rows
+            
             'OCCUPATION_TYPE': np.where(
-                np.random.random(n) < 0.15,   # 15% will be NaN
+                np.random.random(n) < 0.15,  
                 np.nan,
                 np.random.choice(['Laborers', 'Core staff', 'Managers', 'Drivers'], n)
             ),
 
-            # Target — highly imbalanced (only 8% defaulters, realistic for credit)
+           
             'TARGET': np.random.choice([0, 1], n, p=[0.92, 0.08])
         })
 
-        # Inject some outliers so the noise auditor has something to find
+        
         outlier_indices = np.random.choice(n, size=30, replace=False)
-        df.loc[outlier_indices, 'AMT_INCOME_TOTAL'] = 99999999   # impossible income
+        df.loc[outlier_indices, 'AMT_INCOME_TOTAL'] = 99999999   
 
-        # Inject some duplicate rows
+        
         dupe_rows = df.sample(20, random_state=42)
         df = pd.concat([df, dupe_rows], ignore_index=True)
 
@@ -163,42 +141,38 @@ def load_demo_data() -> pd.DataFrame:
 
 
 def plot_learning_curve(curve_data: dict, diagnosis: str) -> plt.Figure:
-    """
-    Draw the learning curve chart from the curve autopsy results.
-    Returns a matplotlib Figure object (Streamlit can display this directly).
-    """
-    # Extract the curve data points
+   
+    
     train_sizes = curve_data["train_sizes"]
     train_mean  = curve_data["train_scores_mean"]
     train_std   = curve_data["train_scores_std"]
     val_mean    = curve_data["val_scores_mean"]
     val_std     = curve_data["val_scores_std"]
 
-    # Diagnosis → color for the chart title
+  
     diag_colors = {
         "HEALTHY": "green", "DATA-STARVED": "red",
         "OVER-COMPLEX": "orange", "LEAKY": "purple"
     }
     title_color = diag_colors.get(diagnosis, "black")
 
-    # Create figure and axes
+   
     fig, ax = plt.subplots(figsize=(9, 4))
-    fig.patch.set_facecolor('#f8f9fa')   # match app background
+    fig.patch.set_facecolor('#f8f9fa')  
     ax.set_facecolor('#ffffff')
 
-    # Plot training score line
+    
     ax.plot(train_sizes, train_mean,
             color='#0066cc', linewidth=2.5, marker='o', markersize=5,
             label='Training AUC')
 
-    # Shaded area = ±1 standard deviation around the training curve
-    # This shows stability — wider band = less stable
+  
     ax.fill_between(train_sizes,
                     np.array(train_mean) - np.array(train_std),
                     np.array(train_mean) + np.array(train_std),
                     alpha=0.15, color='#0066cc')
 
-    # Plot validation score line
+   
     ax.plot(train_sizes, val_mean,
             color='#e65100', linewidth=2.5, marker='s', markersize=5,
             label='Validation AUC (CV=5)')
@@ -208,24 +182,22 @@ def plot_learning_curve(curve_data: dict, diagnosis: str) -> plt.Figure:
                     np.array(val_mean) + np.array(val_std),
                     alpha=0.15, color='#e65100')
 
-    # Labels and formatting
+    
     ax.set_xlabel("Training Set Size (samples)", fontsize=11)
     ax.set_ylabel("AUC Score", fontsize=11)
     ax.set_title(f"Learning Curve — Diagnosis: {diagnosis}",
                  fontsize=13, fontweight='bold', color=title_color)
     ax.legend(fontsize=10)
-    ax.set_ylim(0.4, 1.05)          # AUC always between 0.5 and 1.0
-    ax.grid(True, alpha=0.3)        # light grid for readability
-    ax.spines['top'].set_visible(False)    # remove top border
-    ax.spines['right'].set_visible(False)  # remove right border
+    ax.set_ylim(0.4, 1.05)         
+    ax.grid(True, alpha=0.3)        
+    ax.spines['top'].set_visible(False)   
+    ax.spines['right'].set_visible(False)  
 
     plt.tight_layout()
     return fig
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SIDEBAR — Upload and configuration controls
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 with st.sidebar:
     st.image("https://img.icons8.com/color/96/microscope.png", width=60)
@@ -233,7 +205,7 @@ with st.sidebar:
     st.caption("Clinical AI Failure Diagnostic Tool")
     st.markdown("---")
 
-    # Data source selection
+    
     st.subheader("1. Load Data")
     data_source = st.radio(
         "Choose data source:",
